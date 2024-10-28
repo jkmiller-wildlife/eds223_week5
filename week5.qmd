@@ -1,0 +1,133 @@
+---
+title: "EDS 223 week5"
+format: html
+editor: visual
+---
+
+```{r}
+library(sf) # vector handling
+library(terra) # raster handling
+library(tidyverse)
+library(tmap) # map making
+library(spData) # spatial data
+library(spDataLarge) # spatial data
+library(viridisLite)
+```
+
+
+```{r}
+# load raster dataset
+elevation <- rast(system.file("raster/srtm.tif", package = "spDataLarge"))
+
+# load vector dataset
+boundary <- read_sf(system.file("vector/zion.gpkg", package = "spDataLarge"))
+
+
+```
+
+```{r}
+# check if coordinate reference systems match
+if(crs(elevation) == crs(boundary)) {
+  print("Coordinate reference systems match")
+} else{
+  warning("Updating coordinate reference systems to match")
+  # transform data to match
+  boundary <- st_transform(boundary, st_crs(elevation))
+}
+
+
+```
+
+```{r}
+tm_shape(elevation) +
+  tm_raster(title = "Elevation (meters)") +
+tm_shape(boundary) +
+  tm_borders(lwd = 2) + #update line width
+tm_layout(legend.outside = TRUE) #legend outside
+```
+
+
+```{r}
+# crop raster to extent of vector object
+elevation_cropped <- terra::crop(elevation, boundary)
+```
+
+```{r}
+tm_shape(elevation_cropped) +
+  tm_raster(title = "Elevation (meters)") +
+tm_shape(boundary) +
+  tm_borders(lwd = 2) + #update line width
+tm_layout(legend.outside = TRUE) #legend outside
+```
+
+```{r}
+# mask raster based on vector object
+# (cells outside of vector are converted to NA)
+elevation_masked <- terra::mask(elevation, boundary)
+
+```
+
+
+```{r}
+tm_shape(elevation_masked) +
+  tm_raster(title = "Elevation (meters)") +
+tm_shape(boundary) +
+  tm_borders(lwd = 2) + #update line width
+tm_layout(legend.outside = TRUE) #legend outside
+```
+
+
+```{r}
+# mask raster based on vector object
+# (cells inside of vector are converted to NA)
+elevation_inv_masked <- mask(elevation_cropped, boundary, inverse = TRUE)
+
+```
+
+```{r}
+tm_shape(elevation_inv_masked) +
+  tm_raster(title = "Elevation (meters)") +
+tm_shape(boundary) +
+  tm_borders(lwd = 2) + #update line width
+tm_layout(legend.outside = TRUE) #legend outside
+```
+
+##Raster Vectorization
+
+```{r}
+#masking to cells inside of park
+# crop and mask raster
+elevation_final <- mask(elevation_cropped, boundary)
+
+
+#Create mask based on value of cells; subsetting
+elevation_mask <- elevation_final
+elevation_mask[elevation_mask < 2000] <- NA
+
+
+elevation_mask_poly <- as.polygons(elevation_mask) %>% 
+  st_as_sf()
+```
+
+```{r}
+#directly reassign layer names; does this replace "srtm" with "elevation"? or does it just change the layer name?
+names(elevation) <- "elevation"
+```
+
+
+
+
+```{r}
+map1 <- tm_shape(elevation_mask) +
+  tm_raster() +
+  tm_layout(legend.outside = TRUE,
+            main.title = "masked raster")
+
+map2 <- tm_shape(elevation_mask_poly) +
+  tm_polygons() +
+  tm_layout(main.title = "vectorized raster")
+
+tmap_arrange(map1, map2, nrow = 1)
+```
+
+
